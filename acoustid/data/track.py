@@ -120,19 +120,28 @@ def merge_mbids(fingerprint_db, ingest_db, target_mbid, source_mbids):
             mbid=target_mbid, disabled=row['all_disabled']))
 
 
-def merge_missing_mbids(fingerprint_db, ingest_db):
-    # type: (FingerprintDB, IngestDB) -> None
+def merge_missing_mbids(fingerprint_db: FingerprintDB, ingest_db: IngestDB, only_mbid: Optional[str] = None) -> None:
     """
     Lookup which MBIDs has been merged in MusicBrainz and merge then
     in the AcoustID database as well.
     """
-    logger.debug("Merging missing MBIDs")
-    results = fingerprint_db.execute("""
-        SELECT DISTINCT tm.mbid AS old_mbid, mt.gid AS new_mbid
-        FROM track_mbid tm
-        JOIN musicbrainz.recording_gid_redirect mgr ON tm.mbid = mgr.gid
-        JOIN musicbrainz.recording mt ON mt.id = mgr.new_id
-    """)
+    if only_mbid:
+        logger.debug("Merging missing MBIDs")
+        results = fingerprint_db.execute("""
+            SELECT DISTINCT tm.mbid AS old_mbid, mt.gid AS new_mbid
+            FROM track_mbid tm
+            JOIN musicbrainz.recording_gid_redirect mgr ON tm.mbid = mgr.gid
+            JOIN musicbrainz.recording mt ON mt.id = mgr.new_id
+            WHERE track_mbid.mbid = %s
+        """, (only_mbid,))
+    else:
+        logger.debug("Merging missing MBIDs")
+        results = fingerprint_db.execute("""
+            SELECT DISTINCT tm.mbid AS old_mbid, mt.gid AS new_mbid
+            FROM track_mbid tm
+            JOIN musicbrainz.recording_gid_redirect mgr ON tm.mbid = mgr.gid
+            JOIN musicbrainz.recording mt ON mt.id = mgr.new_id
+        """)
     merge = {}  # type: Dict[str, List[str]]
     for old_mbid, new_mbid in results:
         merge.setdefault(str(new_mbid), []).append(str(old_mbid))
